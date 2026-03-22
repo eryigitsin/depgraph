@@ -1,16 +1,20 @@
 {
   "name": "depgraph",
   "version": "1.0.0",
-  "description": "A local CLI tool that parses import/require statements and creates an interactive dependency graph",
+  "description": "A CLI tool that parses import/require statements and creates an interactive dependency graph visualization",
   "type": "module",
   "bin": {
     "depgraph": "./dist/cli.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build:cli": "tsc -p tsconfig.cli.json",
     "build:ui": "vite build",
     "build": "npm run build:cli && npm run build:ui",
-    "dev": "vite"
+    "dev": "vite",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "dependency",

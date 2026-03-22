@@ -151,6 +151,7 @@ function extractImports(content: string): string[] {
 
 /**
  * Resolve a relative import specifier to an actual file path.
+ * Handles specifiers with or without extensions (e.g. './parser.js' -> './parser.ts').
  */
 function resolveLocalImport(
   specifier: string,
@@ -158,28 +159,48 @@ function resolveLocalImport(
   rootDir: string
 ): string | null {
   const dir = path.dirname(fromFile);
-  let resolved = path.resolve(dir, specifier);
 
-  // Try exact path first
-  if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
-    return resolved;
+  // Normalize specifier: remove extension if present so we can try .ts/.tsx etc.
+  let cleanSpecifier = specifier;
+  const specExt = path.extname(specifier).toLowerCase();
+  const moduleExts = new Set([".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts"]);
+  if (specExt && moduleExts.has(specExt)) {
+    cleanSpecifier = specifier.slice(0, -specExt.length);
   }
 
-  // Try adding extensions
+  const resolvedBase = path.resolve(dir, cleanSpecifier);
+  const resolvedOriginal = path.resolve(dir, specifier);
+
+  // 1. Try exact paths
+  for (const r of [resolvedOriginal, resolvedBase]) {
+    if (fs.existsSync(r) && fs.statSync(r).isFile()) {
+      return r;
+    }
+  }
+
+  // 2. Try adding source extensions to base
   for (const ext of SOURCE_EXTENSIONS) {
-    const withExt = resolved + ext;
-    if (fs.existsSync(withExt)) {
+    const withExt = resolvedBase + ext;
+    if (fs.existsSync(withExt) && fs.statSync(withExt).isFile()) {
       return withExt;
     }
   }
 
-  // Try as directory with index file
-  if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+  // 3. Try as directory index
+  if (fs.existsSync(resolvedBase) && fs.statSync(resolvedBase).isDirectory()) {
     for (const ext of SOURCE_EXTENSIONS) {
-      const indexFile = path.join(resolved, `index${ext}`);
-      if (fs.existsSync(indexFile)) {
+      const indexFile = path.join(resolvedBase, `index${ext}`);
+      if (fs.existsSync(indexFile) && fs.statSync(indexFile).isFile()) {
         return indexFile;
       }
+    }
+  }
+
+  // 4. Fallback: try adding extensions to original
+  for (const ext of SOURCE_EXTENSIONS) {
+    const withExt = resolvedOriginal + ext;
+    if (fs.existsSync(withExt) && fs.statSync(withExt).isFile()) {
+      return withExt;
     }
   }
 
